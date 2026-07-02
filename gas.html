@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>기체의 성질 - 온도·압력과 부피</title>
+<style>
+*{box-sizing:border-box;}
+body{
+    margin:0;
+    font-family:"Malgun Gothic",sans-serif;
+    background:#eef5ff;
+    color:#222;
+}
+header{
+    background:#2b6cb0;
+    color:white;
+    text-align:center;
+    padding:20px;
+}
+h1{margin:0;font-size:2rem;}
+p{font-size:1.05rem;}
+.container{
+    max-width:1200px;
+    margin:auto;
+    padding:20px;
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(420px,1fr));
+    gap:20px;
+}
+.card{
+    background:white;
+    border-radius:18px;
+    padding:22px;
+    box-shadow:0 5px 15px rgba(0,0,0,.12);
+}
+h2{
+    margin-top:0;
+    color:#2b6cb0;
+    font-size:1.7rem;
+}
+label{
+    display:block;
+    margin-top:18px;
+    font-size:1.2rem;
+    font-weight:bold;
+}
+.value{
+    font-size:1.35rem;
+    color:#d9480f;
+}
+input[type=range]{
+    width:100%;
+    margin-top:10px;
+}
+.visual{
+    height:230px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    margin:20px 0;
+    border:2px solid #ccc;
+    background:#f8fbff;
+    border-radius:12px;
+    overflow:hidden;
+}
+canvas{
+    display:block;
+}
+.feedback{
+    min-height:80px;
+    padding:15px;
+    background:#edf7ed;
+    border-left:8px solid #2f9e44;
+    font-size:1.15rem;
+    line-height:1.6;
+    border-radius:10px;
+}
+button{
+    width:100%;
+    margin-top:20px;
+    font-size:1.2rem;
+    padding:14px;
+    border:none;
+    border-radius:10px;
+    background:#2b6cb0;
+    color:white;
+    cursor:pointer;
+}
+button:hover{
+    background:#1f4f85;
+}
+footer{
+    text-align:center;
+    padding:20px;
+    font-size:1rem;
+    color:#555;
+}
+@media(max-width:600px){
+    h1{font-size:1.6rem;}
+    .container{grid-template-columns:1fr;}
+    h2{font-size:1.4rem;}
+}
+</style>
+</head>
+<body>
+
+<header>
+<h1>기체의 성질 탐구</h1>
+<p>온도와 부피의 관계, 압력과 부피의 관계를 기체 입자의 움직임으로 직접 확인해 봅시다.</p>
+</header>
+
+<div class="container">
+
+<!-- ===================== 블록1 ====================== -->
+<div class="card">
+<h2>① 온도 ↔ 부피</h2>
+
+<label>
+온도 :
+<span id="tempValue" class="value">20℃</span>
+</label>
+<input type="range" id="temp" min="0" max="100" value="20">
+
+<div class="visual">
+<canvas id="canvasTemp" width="400" height="230"></canvas>
+</div>
+
+<div class="feedback" id="tempFeedback"></div>
+
+<button onclick="resetTemp()">다시 시작</button>
+</div>
+
+<!-- ===================== 블록2 ====================== -->
+<div class="card">
+<h2>② 압력 ↔ 부피</h2>
+
+<label>
+압력 :
+<span id="pressureValue" class="value">1.0 atm</span>
+</label>
+<input type="range" id="pressure" min="1" max="5" step="0.1" value="1">
+
+<div class="visual">
+<canvas id="canvasPressure" width="400" height="230"></canvas>
+</div>
+
+<div class="feedback" id="pressureFeedback"></div>
+
+<button onclick="resetPressure()">다시 시작</button>
+</div>
+
+</div>
+
+<footer>
+중학교 1학년 과학 · 기체의 성질
+</footer>
+
+<script>
+/* ============================================================
+   공통 입자 시뮬레이션 엔진
+   - 실린더(용기) 안에서 입자가 튕기며 움직인다
+   - 위쪽 벽(피스톤)의 위치가 부피를 나타낸다
+   - 입자의 속도가 온도(입자 운동 에너지)를 나타낸다
+   ============================================================ */
+function createGasSim(canvas, particleCount){
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width;
+    const H = canvas.height;
+
+    // 용기(실린더) 벽 - 좌우/바닥은 고정, 위쪽(피스톤)만 움직인다
+    const boxLeft = 50;
+    const boxRight = W - 50;
+    const boxBottom = H - 15;
+
+    const state = {
+        pistonY: 40,          // 목표 피스톤 위치 (부피)
+        currentPistonY: 40,   // 화면에 실제로 그려지는 피스톤 위치(부드러운 애니메이션용)
+        speedScale: 1,        // 입자 속도 배율(온도)
+        particles: []
+    };
+
+    for(let i=0;i<particleCount;i++){
+        state.particles.push({
+            x: boxLeft + Math.random()*(boxRight-boxLeft),
+            y: state.pistonY + Math.random()*(boxBottom-state.pistonY),
+            vx: (Math.random()-0.5)*2,
+            vy: (Math.random()-0.5)*2,
+            r: 6
+        });
+    }
+
+    function step(){
+        // 피스톤 위치를 목표값으로 부드럽게 이동
+        state.currentPistonY += (state.pistonY - state.currentPistonY)*0.12;
+        const top = state.currentPistonY;
+
+        // 배경
+        ctx.clearRect(0,0,W,H);
+
+        // 실린더 바깥(회색 상단부, 피스톤 손잡이가 지나가는 통로)
+        ctx.fillStyle = "#dbe7f5";
+        ctx.fillRect(boxLeft-10, 10, (boxRight-boxLeft)+20, boxBottom-10+15-10);
+
+        // 입자 이동 및 충돌 처리
+        for(const p of state.particles){
+            p.x += p.vx * state.speedScale;
+            p.y += p.vy * state.speedScale;
+
+            if(p.x - p.r < boxLeft){ p.x = boxLeft + p.r; p.vx *= -1; }
+            if(p.x + p.r > boxRight){ p.x = boxRight - p.r; p.vx *= -1; }
+            if(p.y - p.r < top){ p.y = top + p.r; p.vy *= -1; }
+            if(p.y + p.r > boxBottom){ p.y = boxBottom - p.r; p.vy *= -1; }
+        }
+
+        // 용기(실제 기체가 담긴 영역) 채우기
+        ctx.fillStyle = "#eaf4ff";
+        ctx.fillRect(boxLeft, top, boxRight-boxLeft, boxBottom-top);
+
+        // 입자 그리기
+        for(const p of state.particles){
+            const grad = ctx.createRadialGradient(p.x-2,p.y-2,1,p.x,p.y,p.r);
+            grad.addColorStop(0, "#90cdf4");
+            grad.addColorStop(1, "#2b6cb0");
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        // 용기 벽 (좌/우/바닥)
+        ctx.strokeStyle = "#1a365d";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(boxLeft, 5);
+        ctx.lineTo(boxLeft, boxBottom);
+        ctx.lineTo(boxRight, boxBottom);
+        ctx.lineTo(boxRight, 5);
+        ctx.stroke();
+
+        // 피스톤(위쪽 뚜껑)
+        ctx.fillStyle = "#1a365d";
+        ctx.fillRect(boxLeft-6, top-8, (boxRight-boxLeft)+12, 10);
+        // 피스톤 손잡이
+        ctx.fillRect(W/2-4, 10, 8, top-10 > 0 ? top-18 : 0);
+
+        requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+
+    return state;
+}
+
+/* ============================================================
+   블록 ① 온도 ↔ 부피 (샤를 법칙)
+   ============================================================ */
+const temp=document.getElementById("temp");
+const tempValue=document.getElementById("tempValue");
+const tempFeedback=document.getElementById("tempFeedback");
+const simTemp = createGasSim(document.getElementById("canvasTemp"), 26);
+
+function updateTemp(){
+    let t=Number(temp.value);
+    tempValue.textContent=t+"℃";
+
+    // 온도가 높을수록 부피(피스톤 높이)가 커진다 -> 피스톤이 위로 올라간다
+    let h = 60 + t*1.5;           // 용기 높이
+    simTemp.pistonY = 215 - h;    // 위쪽 벽 위치
+    if(simTemp.pistonY < 15) simTemp.pistonY = 15;
+
+    // 온도가 높을수록 입자 운동이 빨라진다
+    simTemp.speedScale = 0.4 + (t/100)*2.4;
+
+    let text="";
+    if(t<25){
+        text="🧊 온도가 낮습니다.<br><b>기체 입자의 운동이 느려지고 부피가 작아집니다.</b>";
+    }
+    else if(t<60){
+        text="🙂 온도가 높아질수록 기체 입자의 운동이 활발해지고 <b>부피가 점점 커집니다.</b>";
+    }
+    else{
+        text="🔥 온도가 매우 높습니다.<br><b>입자가 빠르게 움직이며 서로 더 세게, 더 자주 부딪혀 부피가 커집니다. (샤를 법칙)</b>";
+    }
+    tempFeedback.innerHTML=text;
+}
+
+temp.addEventListener("input",updateTemp);
+
+function resetTemp(){
+    temp.value=20;
+    updateTemp();
+}
+
+updateTemp();
+
+/* ============================================================
+   블록 ② 압력 ↔ 부피 (보일 법칙)
+   ============================================================ */
+const pressure=document.getElementById("pressure");
+const pressureValue=document.getElementById("pressureValue");
+const pressureFeedback=document.getElementById("pressureFeedback");
+const simPressure = createGasSim(document.getElementById("canvasPressure"), 26);
+simPressure.speedScale = 1.6; // 온도는 일정하다고 가정 (등온 과정)
+
+function updatePressure(){
+    let p=Number(pressure.value);
+    pressureValue.textContent=p.toFixed(1)+" atm";
+
+    // 압력이 커질수록 부피(피스톤 높이)가 작아진다 -> 피스톤이 아래로 내려온다
+    let h = 220 - p*38;
+    if(h<45) h=45;
+    simPressure.pistonY = 215 - h;
+
+    let text="";
+    if(p<2){
+        text="🙂 압력이 낮습니다.<br><b>기체 입자가 넓은 공간에서 움직여 부피가 큽니다.</b>";
+    }
+    else if(p<4){
+        text="📦 압력이 커질수록 입자가 좁은 공간으로 눌려 <b>충돌이 잦아지고 부피가 작아집니다.</b>";
+    }
+    else{
+        text="💪 압력이 매우 큽니다.<br><b>같은 수의 입자가 더 좁은 공간에 모여 있습니다. 압력이 증가하면 부피는 감소합니다. (보일 법칙)</b>";
+    }
+    pressureFeedback.innerHTML=text;
+}
+
+pressure.addEventListener("input",updatePressure);
+
+function resetPressure(){
+    pressure.value=1;
+    updatePressure();
+}
+
+updatePressure();
+</script>
+
+</body>
+</html>
