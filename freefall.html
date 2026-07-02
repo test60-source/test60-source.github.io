@@ -1,205 +1,312 @@
 <!DOCTYPE html>
 <!--
-  자유낙하 시뮬레이션 — 시간-속력 그래프
+  자유낙하 비교 시뮬레이션 — 두 행성 동시 비교
   · 단일 .html · 외부 라이브러리 없음 · 더블클릭/ GitHub Pages 모두 작동
-  · 탐구: 자유낙하에서 속력은 시간에 따라 어떻게 변할까?
+  · 탐구: 중력이 다른 두 행성에서 자유낙하 속력은 어떻게 다르게 변할까?
 -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>자유낙하 시간-속력 그래프</title>
+<title>자유낙하 비교 — 두 행성 시간-속력 그래프</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:system-ui,"Malgun Gothic",sans-serif;background:#0f1830;color:#eaf0ff;
        min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:22px;}
   h1{font-size:1.5rem;margin-bottom:4px;text-align:center;}
   .q{color:#9fb3e6;font-size:.98rem;margin-bottom:18px;text-align:center;}
-  .controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:16px;}
-  .controls span{align-self:center;color:#9fb3e6;font-size:.9rem;margin-right:4px;}
+  .global-controls{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:20px;}
   button{border:none;border-radius:10px;padding:10px 16px;font-size:.95rem;font-weight:700;cursor:pointer;
          background:#23314f;color:#cdd9f5;transition:transform .1s;}
   button:hover{transform:translateY(-1px);}
-  button.sel{background:#5b8cff;color:#0f1830;}
-  button.go{background:#5b8cff;color:#0f1830;}
+  button.sel{color:#0f1830;}
+  button.go{background:#5b8cff;color:#0f1830;font-size:1.05rem;padding:12px 26px;}
   button.reset{background:transparent;border:1px solid #3a4a73;color:#9fb3e6;}
-  .stage{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;width:100%;max-width:780px;}
-  .panel{background:#16203c;border:1px solid #2a3a63;border-radius:14px;padding:16px;}
-  .tower-wrap{width:150px;display:flex;flex-direction:column;align-items:center;}
-  .tower{position:relative;width:80px;height:300px;background:linear-gradient(#1b2746,#16203c);
+
+  .compare-stage{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;width:100%;max-width:1040px;}
+  .side{flex:1 1 460px;max-width:500px;background:#131c37;border:1px solid #263457;border-radius:16px;padding:16px;}
+  .side-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .side-title{font-weight:700;font-size:1.05rem;}
+  .side-title .planet-emoji{margin-right:6px;}
+  .grav-picker{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .grav-picker button{padding:7px 11px;font-size:.85rem;}
+
+  .stage{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;}
+  .panel{background:#16203c;border:1px solid #2a3a63;border-radius:14px;padding:12px;}
+  .tower-wrap{width:110px;display:flex;flex-direction:column;align-items:center;}
+  .tower{position:relative;width:64px;height:260px;background:linear-gradient(#1b2746,#16203c);
          border:1px solid #2a3a63;border-radius:8px;overflow:hidden;}
   .ground{position:absolute;bottom:0;left:0;width:100%;height:8px;background:#3a4a73;}
-  .ball{position:absolute;left:50%;top:0;width:24px;height:24px;margin-left:-12px;border-radius:50%;
-        background:radial-gradient(circle at 35% 30%,#ffd36a,#e8930f);box-shadow:0 0 12px rgba(255,180,60,.5);}
+  .ball{position:absolute;left:50%;top:0;width:20px;height:20px;margin-left:-10px;border-radius:50%;
+        box-shadow:0 0 12px rgba(255,180,60,.5);}
   canvas{background:#0c1326;border-radius:10px;}
-  .readout{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:14px;font-size:.95rem;}
-  .readout b{color:#ffd36a;font-variant-numeric:tabular-nums;}
-  .msg{margin-top:12px;min-height:1.4em;font-size:1rem;font-weight:600;color:#8fe3b0;text-align:center;}
+
+  .readout{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:12px;font-size:.88rem;}
+  .readout b{font-variant-numeric:tabular-nums;}
+  .msg{margin-top:10px;min-height:2.6em;font-size:.92rem;font-weight:600;text-align:center;line-height:1.4;}
+
+  .summary{width:100%;max-width:1040px;margin-top:22px;background:#16203c;border:1px solid #2a3a63;
+           border-radius:14px;padding:16px 20px;font-size:.95rem;text-align:center;color:#cdd9f5;min-height:1.4em;}
+  .summary b{color:#ffd36a;}
   footer{margin-top:18px;color:#5a6a96;font-size:.8rem;}
+
+  @media (max-width:520px){
+    .side{max-width:100%;}
+  }
 </style>
 </head>
 <body>
-  <h1>🪂 자유낙하 — 시간-속력 그래프</h1>
-  <p class="q">🤔 자유낙하에서 속력은 시간에 따라 어떻게 변할까? (공기 저항은 무시)</p>
+  <h1>🪂 자유낙하 비교 — 두 행성 동시 실험</h1>
+  <p class="q">🤔 중력이 다른 두 행성에서 자유낙하 속력은 시간에 따라 어떻게 다르게 변할까? (공기 저항은 무시)</p>
 
-  <div class="controls">
-    <span>중력</span>
-    <button class="grav sel" data-g="9.8">지구 9.8</button>
-    <button class="grav" data-g="1.6">달 1.6</button>
-    <button class="grav" data-g="3.7">화성 3.7</button>
-    <button class="go" id="start">시작 ▶</button>
+  <div class="global-controls">
+    <button class="go" id="start">두 행성 동시 시작 ▶</button>
     <button class="reset" id="reset">다시</button>
   </div>
 
-  <div class="stage">
-    <div class="panel tower-wrap">
-      <div class="tower"><div class="ball" id="ball"></div><div class="ground"></div></div>
-      <div style="color:#9fb3e6;font-size:.8rem;margin-top:8px">낙하 높이 45 m</div>
-    </div>
-    <div class="panel">
-      <canvas id="graph" width="440" height="300"></canvas>
-    </div>
+  <div class="compare-stage">
+    <!-- 왼쪽: 행성 A -->
+    <div class="side" id="sideA"></div>
+    <!-- 오른쪽: 행성 B -->
+    <div class="side" id="sideB"></div>
   </div>
 
-  <div class="readout">
-    <div>시간 <b id="tVal">0.00</b> s</div>
-    <div>속력 <b id="vVal">0.0</b> m/s</div>
-    <div>낙하 거리 <b id="yVal">0.0</b> m</div>
-  </div>
-  <div class="msg" id="msg">중력을 고르고 ‘시작’을 눌러 보세요.</div>
+  <div class="summary" id="summary">두 행성을 고르고 ‘동시 시작’을 눌러 속력 변화를 비교해 보세요.</div>
   <footer>탐구 아카이브 · GitHub Pages</footer>
 
 <script>
-  var H_FALL = 45;           // 낙하 높이(m)
-  var g = 9.8;               // 중력가속도
-  var running = false, landed = false;
-  var t = 0, lastTs = null;
-  var samples = [];          // {t, v}
-  var t_end = 0, v_max = 0;
+  // ---- 행성 데이터 ----
+  var PLANETS = [
+    {id:'earth',  name:'지구', emoji:'🌍', g:9.8,  color:'#5b8cff'},
+    {id:'moon',   name:'달',   emoji:'🌙', g:1.6,  color:'#9fb3e6'},
+    {id:'mars',   name:'화성', emoji:'🔴', g:3.7,  color:'#ff7a5b'},
+    {id:'jupiter',name:'목성', emoji:'🟠', g:24.8, color:'#ffd36a'}
+  ];
+  var H_FALL = 45; // 낙하 높이(m), 두 행성 공통
 
-  var ball = document.getElementById('ball');
-  var cv = document.getElementById('graph');
-  var ctx = cv.getContext('2d');
-  var tVal = document.getElementById('tVal');
-  var vVal = document.getElementById('vVal');
-  var yVal = document.getElementById('yVal');
-  var msg = document.getElementById('msg');
+  // ---- 사이드(행성 하나) 상태를 만드는 팩토리 ----
+  function makeSide(containerId, defaultPlanetIdx){
+    var container = document.getElementById(containerId);
+    var uid = containerId;
 
-  function computeBounds(){
-    t_end = Math.sqrt(2 * H_FALL / g);   // 착지 시간
-    v_max = g * t_end;                   // 도달 속력
+    container.innerHTML =
+      '<div class="side-head"><div class="side-title"><span class="planet-emoji" id="'+uid+'_emoji">🌍</span><span id="'+uid+'_name">지구</span></div></div>' +
+      '<div class="grav-picker" id="'+uid+'_picker"></div>' +
+      '<div class="stage">' +
+        '<div class="panel tower-wrap"><div class="tower"><div class="ball" id="'+uid+'_ball"></div><div class="ground"></div></div>' +
+        '<div style="color:#9fb3e6;font-size:.75rem;margin-top:8px">낙하 높이 '+H_FALL+' m</div></div>' +
+        '<div class="panel"><canvas id="'+uid+'_graph" width="300" height="240"></canvas></div>' +
+      '</div>' +
+      '<div class="readout">' +
+        '<div>시간 <b id="'+uid+'_t">0.00</b> s</div>' +
+        '<div>속력 <b id="'+uid+'_v">0.0</b> m/s</div>' +
+        '<div>낙하 거리 <b id="'+uid+'_y">0.0</b> m</div>' +
+      '</div>' +
+      '<div class="msg" id="'+uid+'_msg">중력을 고르고 ‘동시 시작’을 눌러 보세요.</div>';
+
+    var picker = document.getElementById(uid+'_picker');
+    PLANETS.forEach(function(p, idx){
+      var btn = document.createElement('button');
+      btn.textContent = p.emoji + ' ' + p.name;
+      btn.dataset.idx = idx;
+      if(idx === defaultPlanetIdx) btn.classList.add('sel');
+      picker.appendChild(btn);
+    });
+
+    var state = {
+      uid: uid,
+      planet: PLANETS[defaultPlanetIdx],
+      g: PLANETS[defaultPlanetIdx].g,
+      running: false, landed: false,
+      t: 0, lastTs: null, samples: [],
+      t_end: 0, v_max: 0,
+      el: {
+        emoji: document.getElementById(uid+'_emoji'),
+        name: document.getElementById(uid+'_name'),
+        ball: document.getElementById(uid+'_ball'),
+        canvas: document.getElementById(uid+'_graph'),
+        tVal: document.getElementById(uid+'_t'),
+        vVal: document.getElementById(uid+'_v'),
+        yVal: document.getElementById(uid+'_y'),
+        msg: document.getElementById(uid+'_msg'),
+        picker: picker
+      }
+    };
+    state.ctx = state.el.canvas.getContext('2d');
+
+    picker.querySelectorAll('button').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        picker.querySelectorAll('button').forEach(function(b){ b.classList.remove('sel'); b.style.background=''; b.style.color=''; });
+        btn.classList.add('sel');
+        var p = PLANETS[parseInt(btn.dataset.idx,10)];
+        btn.style.background = p.color; btn.style.color = '#0f1830';
+        applyPlanet(state, p);
+        resetSide(state);
+        updateSummary();
+      });
+    });
+
+    applyPlanet(state, PLANETS[defaultPlanetIdx]);
+    var selBtn = picker.querySelector('button.sel');
+    selBtn.style.background = state.planet.color; selBtn.style.color = '#0f1830';
+
+    return state;
   }
 
-  function drawGraph(){
-    var W = cv.width, Hc = cv.height;
-    var padL = 52, padR = 16, padT = 16, padB = 40;
+  function applyPlanet(state, p){
+    state.planet = p;
+    state.g = p.g;
+    state.el.emoji.textContent = p.emoji;
+    state.el.name.textContent = p.name + ' (g=' + p.g + ' m/s²)';
+    state.el.ball.style.background = 'radial-gradient(circle at 35% 30%, #fff, ' + p.color + ')';
+    state.el.tVal.style.color = p.color;
+    state.el.vVal.style.color = p.color;
+    state.el.yVal.style.color = p.color;
+    state.el.msg.style.color = '#8fe3b0';
+  }
+
+  function computeBounds(state){
+    state.t_end = Math.sqrt(2 * H_FALL / state.g);
+    state.v_max = state.g * state.t_end;
+  }
+
+  function drawGraph(state){
+    var W = state.el.canvas.width, Hc = state.el.canvas.height;
+    var ctx = state.ctx;
+    var padL = 48, padR = 12, padT = 14, padB = 34;
     ctx.clearRect(0,0,W,Hc);
-    // 축
     ctx.strokeStyle = '#3a4a73'; ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(padL, padT); ctx.lineTo(padL, Hc-padB); ctx.lineTo(W-padR, Hc-padB);
     ctx.stroke();
-    // 라벨
-    ctx.fillStyle = '#9fb3e6'; ctx.font = '12px sans-serif';
+    ctx.fillStyle = '#9fb3e6'; ctx.font = '11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('시간 (s)', (padL + W - padR)/2, Hc-10);
+    ctx.fillText('시간 (s)', (padL + W - padR)/2, Hc-8);
     ctx.save();
-    ctx.translate(14, (padT + Hc-padB)/2); ctx.rotate(-Math.PI/2);
+    ctx.translate(12, (padT + Hc-padB)/2); ctx.rotate(-Math.PI/2);
     ctx.fillText('속력 (m/s)', 0, 0); ctx.restore();
-    // 눈금
+
     ctx.fillStyle = '#6b7aa3'; ctx.textAlign = 'right';
     for(var i=0;i<=4;i++){
-      var vy = v_max * i/4;
-      var py = (Hc-padB) - (vy/v_max)*(Hc-padT-padB);
+      var vy = state.v_max * i/4;
+      var py = (Hc-padB) - (vy/state.v_max)*(Hc-padT-padB);
       ctx.fillText(vy.toFixed(0), padL-6, py+4);
       ctx.strokeStyle = '#1d2949'; ctx.beginPath();
       ctx.moveTo(padL, py); ctx.lineTo(W-padR, py); ctx.stroke();
     }
     ctx.textAlign = 'center';
     for(var j=0;j<=4;j++){
-      var tx = t_end * j/4;
-      var px = padL + (tx/t_end)*(W-padL-padR);
-      ctx.fillText(tx.toFixed(1), px, Hc-padB+16);
+      var tx = state.t_end * j/4;
+      var px = padL + (tx/state.t_end)*(W-padL-padR);
+      ctx.fillText(tx.toFixed(1), px, Hc-padB+14);
     }
-    // 데이터 선
-    if(samples.length > 1){
-      ctx.strokeStyle = '#5b8cff'; ctx.lineWidth = 3;
+
+    if(state.samples.length > 1){
+      ctx.strokeStyle = state.planet.color; ctx.lineWidth = 3;
       ctx.beginPath();
-      for(var k=0;k<samples.length;k++){
-        var s = samples[k];
-        var x = padL + (s.t/t_end)*(W-padL-padR);
-        var y = (Hc-padB) - (s.v/v_max)*(Hc-padT-padB);
+      for(var k=0;k<state.samples.length;k++){
+        var s = state.samples[k];
+        var x = padL + (s.t/state.t_end)*(W-padL-padR);
+        var y = (Hc-padB) - (s.v/state.v_max)*(Hc-padT-padB);
         if(k===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
       }
       ctx.stroke();
-      // 현재 점
-      var last = samples[samples.length-1];
-      var lx = padL + (last.t/t_end)*(W-padL-padR);
-      var ly = (Hc-padB) - (last.v/v_max)*(Hc-padT-padB);
+      var last = state.samples[state.samples.length-1];
+      var lx = padL + (last.t/state.t_end)*(W-padL-padR);
+      var ly = (Hc-padB) - (last.v/state.v_max)*(Hc-padT-padB);
       ctx.fillStyle = '#ffd36a'; ctx.beginPath();
       ctx.arc(lx, ly, 5, 0, Math.PI*2); ctx.fill();
     }
   }
 
-  function reset(){
-    running = false; landed = false; t = 0; lastTs = null; samples = [];
-    computeBounds();
-    ball.style.top = '0px';
-    tVal.textContent = '0.00'; vVal.textContent = '0.0'; yVal.textContent = '0.0';
-    msg.textContent = '중력을 고르고 ‘시작’을 눌러 보세요.';
-    msg.style.color = '#8fe3b0';
-    drawGraph();
+  function resetSide(state){
+    state.running = false; state.landed = false; state.t = 0; state.lastTs = null; state.samples = [];
+    computeBounds(state);
+    state.el.ball.style.top = '0px';
+    state.el.tVal.textContent = '0.00';
+    state.el.vVal.textContent = '0.0';
+    state.el.yVal.textContent = '0.0';
+    state.el.msg.textContent = '중력을 고르고 ‘동시 시작’을 눌러 보세요.';
+    drawGraph(state);
   }
 
-  function frame(ts){
-    if(!running) return;
-    if(lastTs === null) lastTs = ts;
-    var dt = (ts - lastTs)/1000; lastTs = ts;
-    if(dt > 0.05) dt = 0.05;       // 큰 점프 방지
-    t += dt;
+  function stepSide(state, ts){
+    if(!state.running) return;
+    if(state.lastTs === null) state.lastTs = ts;
+    var dt = (ts - state.lastTs)/1000; state.lastTs = ts;
+    if(dt > 0.05) dt = 0.05;
+    state.t += dt;
 
-    var y = 0.5 * g * t * t;       // 낙하 거리
-    var v = g * t;                 // 속력
-    if(y >= H_FALL){               // 착지
-      y = H_FALL; v = g * t_end; t = t_end; running = false; landed = true;
+    var y = 0.5 * state.g * state.t * state.t;
+    var v = state.g * state.t;
+    if(y >= H_FALL){
+      y = H_FALL; v = state.g * state.t_end; state.t = state.t_end;
+      state.running = false; state.landed = true;
     }
-    samples.push({t: Math.min(t, t_end), v: Math.min(v, v_max)});
+    state.samples.push({t: Math.min(state.t, state.t_end), v: Math.min(v, state.v_max)});
 
-    var towerPx = 300 - 24 - 8;    // 탑 높이 - 공 - 바닥
-    ball.style.top = (y / H_FALL) * towerPx + 'px';
-    tVal.textContent = t.toFixed(2);
-    vVal.textContent = v.toFixed(1);
-    yVal.textContent = y.toFixed(1);
-    drawGraph();
+    var towerPx = 260 - 20 - 8;
+    state.el.ball.style.top = (y / H_FALL) * towerPx + 'px';
+    state.el.tVal.textContent = state.t.toFixed(2);
+    state.el.vVal.textContent = v.toFixed(1);
+    state.el.yVal.textContent = y.toFixed(1);
+    drawGraph(state);
 
-    if(landed){
-      msg.innerHTML = '착지! 낙하 시간 <b style="color:#ffd36a">'+t_end.toFixed(2)+' s</b>, 도달 속력 <b style="color:#ffd36a">'+v_max.toFixed(1)+' m/s</b> · 그래프가 <b style="color:#ffd36a">직선</b> → 속력이 일정하게 증가(등가속도)!';
+    if(state.landed){
+      state.el.msg.innerHTML = '착지! 낙하 시간 <b style="color:'+state.planet.color+'">'+state.t_end.toFixed(2)+' s</b>, 도달 속력 <b style="color:'+state.planet.color+'">'+state.v_max.toFixed(1)+' m/s</b>';
+      checkBothLanded();
       return;
     }
-    requestAnimationFrame(frame);
+    requestAnimationFrame(function(t2){ stepSide(state, t2); });
   }
 
-  function start(){
-    if(running) return;
-    reset();
-    running = true; landed = false;
-    msg.textContent = '낙하 중…';
-    requestAnimationFrame(frame);
+  function checkBothLanded(){
+    if(stateA.landed && stateB.landed){
+      var faster, slower;
+      if(stateA.t_end < stateB.t_end){ faster = stateA; slower = stateB; }
+      else if(stateB.t_end < stateA.t_end){ faster = stateB; slower = stateA; }
+      else { faster = null; slower = null; }
+
+      var html;
+      if(faster){
+        var diff = (slower.t_end - faster.t_end).toFixed(2);
+        html = '📊 비교 결과: <b>'+faster.planet.name+'</b>(g='+faster.planet.g+' m/s²)이 <b>'+slower.planet.name+'</b>(g='+slower.planet.g+' m/s²)보다 '+diff+'초 먼저 착지했어요. ' +
+               '중력이 클수록 속력이 <b>더 빠르게</b> 증가해서(가속도가 크므로) 같은 높이라도 먼저 떨어집니다. 두 그래프 모두 <b>직선</b>이지만, 기울기(가속도)가 다릅니다.';
+      } else {
+        html = '📊 두 행성의 중력이 같아 동시에 착지했어요! 그래프의 기울기(가속도)도 동일합니다.';
+      }
+      document.getElementById('summary').innerHTML = html;
+    }
   }
 
-  // 중력 선택
-  document.querySelectorAll('.grav').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      document.querySelectorAll('.grav').forEach(function(b){ b.classList.remove('sel'); });
-      btn.classList.add('sel');
-      g = parseFloat(btn.dataset.g);
-      reset();
-    });
+  function startSide(state){
+    state.running = true; state.landed = false; state.lastTs = null;
+    state.el.msg.textContent = '낙하 중…';
+    requestAnimationFrame(function(t2){ stepSide(state, t2); });
+  }
+
+  function resetAll(){
+    resetSide(stateA);
+    resetSide(stateB);
+    document.getElementById('summary').textContent = '두 행성을 고르고 ‘동시 시작’을 눌러 속력 변화를 비교해 보세요.';
+  }
+
+  function updateSummary(){
+    document.getElementById('summary').textContent = '두 행성을 고르고 ‘동시 시작’을 눌러 속력 변화를 비교해 보세요.';
+  }
+
+  var stateA = makeSide('sideA', 0); // 기본: 지구
+  var stateB = makeSide('sideB', 2); // 기본: 화성
+  resetSide(stateA);
+  resetSide(stateB);
+
+  document.getElementById('start').addEventListener('click', function(){
+    resetAll();
+    // reset 이후 살짝 지연 없이 바로 시작 (state가 이미 초기화됨)
+    startSide(stateA);
+    startSide(stateB);
   });
-  document.getElementById('start').addEventListener('click', start);
-  document.getElementById('reset').addEventListener('click', reset);
-
-  reset();
+  document.getElementById('reset').addEventListener('click', resetAll);
 </script>
 </body>
 </html>
